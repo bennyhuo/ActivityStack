@@ -1,7 +1,7 @@
 apply plugin: 'com.android.library'
 
-group = "com.bennyhuo"
-version = "1.0"
+group = GROUP
+version = VERSION_NAME
 
 apply plugin: "com.vanniktech.maven.publish"
 
