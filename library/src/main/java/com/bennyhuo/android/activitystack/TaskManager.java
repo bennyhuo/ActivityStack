@@ -3,12 +3,8 @@ package com.bennyhuo.android.activitystack;
 import android.app.Activity;
 import android.app.Application;
 import android.app.Application.ActivityLifecycleCallbacks;
-import android.content.ComponentCallbacks;
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.os.Bundle;
-
-import com.bennyhuo.android.activitystack.ActivityInfo.ActivityState;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
@@ -30,42 +26,6 @@ public class TaskManager {
 
     private Application application;
 
-    public interface OnApplicationStateChangedListener {
-        int TERMINATED_BY_RECENT_TASKS = 0;
-        int TERMINATED_BY_CRASH = 1;
-        int TERMINATED_ON_VM_DOWN = 2;
-
-        /**
-         * application goes background with all activities in CREATED state.
-         */
-        void onBackground();
-
-        /**
-         * application goes foreground with one of the activities above CREATED state.
-         */
-        void onForeground();
-
-        /**
-         * redirect low memory callback of Application.
-         */
-        void onLowMemory();
-
-        /**
-         * called when application exits abnormally.
-         */
-        void onTerminate(int reason, Throwable throwable);
-
-        void onActivityChanged(Activity previousActivity, Activity currentActivity);
-    }
-
-    public interface OnActivityChangedListener {
-        void onActivityChanged(Activity previousActivity, Activity currentActivity);
-    }
-
-    public interface OnActivityStateChangedListener {
-        void onActivityStateChanged(Activity activity, ActivityState previousState, ActivityState currentState);
-    }
-
     private HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = new HashSet<>();
 
     private void notifyApplicationStateBackground() {
@@ -82,17 +42,10 @@ public class TaskManager {
         }
     }
 
-    private void notifyLowMemory() {
+    void notifyTerminated(Throwable throwable) {
         HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
         for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
-            onApplicationStateChangedListener.onLowMemory();
-        }
-    }
-
-    void notifyTerminated(int reason, Throwable throwable) {
-        HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
-        for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
-            onApplicationStateChangedListener.onTerminate(reason, throwable);
+            onApplicationStateChangedListener.onTerminate(throwable);
         }
     }
 
@@ -107,11 +60,6 @@ public class TaskManager {
     private HashSet<OnActivityChangedListener> onActivityChangedListeners = new HashSet<>();
 
     private void notifyActivityChanged(Activity previousActivity, Activity currentActivity) {
-        HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
-        for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
-            onApplicationStateChangedListener.onActivityChanged(previousActivity, currentActivity);
-        }
-
         HashSet<OnActivityChangedListener> onActivityChangedListeners = (HashSet<OnActivityChangedListener>) this.onActivityChangedListeners.clone();
         for (OnActivityChangedListener onActivityChangedListener : onActivityChangedListeners) {
             onActivityChangedListener.onActivityChanged(previousActivity, currentActivity);
@@ -170,7 +118,6 @@ public class TaskManager {
         if (this.application != null && this.application == application) return;
         this.application = application;
         application.registerActivityLifecycleCallbacks(lifecycleCallbacks);
-        application.registerComponentCallbacks(componentCallbacks);
         originalExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(uncaughtExceptionHandler);
     }
@@ -178,21 +125,8 @@ public class TaskManager {
     void onDestroy() {
         if (application == null) return;
         application.unregisterActivityLifecycleCallbacks(lifecycleCallbacks);
-        application.unregisterComponentCallbacks(componentCallbacks);
         Thread.setDefaultUncaughtExceptionHandler(originalExceptionHandler);
     }
-
-    private ComponentCallbacks componentCallbacks = new ComponentCallbacks() {
-        @Override
-        public void onConfigurationChanged(Configuration newConfig) {
-
-        }
-
-        @Override
-        public void onLowMemory() {
-            TaskManager.INSTANCE.notifyLowMemory();
-        }
-    };
 
     private ActivityLifecycleCallbacks lifecycleCallbacks = new ActivityLifecycleCallbacks() {
         @Override
@@ -236,7 +170,7 @@ public class TaskManager {
     private final Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread thread, Throwable ex) {
-            notifyTerminated(OnApplicationStateChangedListener.TERMINATED_BY_CRASH, ex);
+            notifyTerminated(ex);
             onDestroy();
             if (originalExceptionHandler != null) {
                 originalExceptionHandler.uncaughtException(thread, ex);

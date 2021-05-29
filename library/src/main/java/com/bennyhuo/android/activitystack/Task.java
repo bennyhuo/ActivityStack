@@ -1,8 +1,6 @@
 package com.bennyhuo.android.activitystack;
 
 
-import com.bennyhuo.android.activitystack.ActivityInfo.ActivityState;
-
 import java.util.Stack;
 
 /**

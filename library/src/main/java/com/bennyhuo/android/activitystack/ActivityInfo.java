@@ -3,12 +3,6 @@ package com.bennyhuo.android.activitystack;
 import android.app.Activity;
 
 public class ActivityInfo {
-    public enum ActivityState {
-        DESTROYED,
-        CREATED,
-        STARTED,
-        RESUMED
-    }
 
     final Activity activity;
     ActivityState activityState = ActivityState.CREATED;
