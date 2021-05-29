@@ -14,10 +14,16 @@ public class Task extends Stack<ActivityInfo> {
     public static final int EMPTY_TASK_ID = -1;
     public static final Task EMPTY_TASK = new Task(EMPTY_TASK_ID);
 
-    private int taskId;
+    private final int taskId;
 
     public Task(int taskId) {
         this.taskId = taskId;
+    }
+
+    public Task copy() {
+        Task task = new Task(taskId);
+        task.addAll(this);
+        return task;
     }
 
     public int getTaskId() {

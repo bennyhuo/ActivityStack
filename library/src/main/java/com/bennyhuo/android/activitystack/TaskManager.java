@@ -7,11 +7,14 @@ import android.content.ComponentCallbacks;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
-import android.util.Log;
+
 import com.bennyhuo.android.activitystack.ActivityInfo.ActivityState;
+
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
 
 /**
@@ -22,7 +25,7 @@ public class TaskManager {
 
     final static TaskManager INSTANCE = new TaskManager();
 
-    private HashMap<Integer, Task> tasks = new HashMap<>();
+    private final HashMap<Integer, Task> tasks = new HashMap<>();
     private Task currentTask = Task.EMPTY_TASK;
 
     private Application application;
@@ -66,7 +69,6 @@ public class TaskManager {
     private HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = new HashSet<>();
 
     private void notifyApplicationStateBackground() {
-        Log.d(TAG, "Application goes background.");
         HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
         for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
             onApplicationStateChangedListener.onBackground();
@@ -74,7 +76,6 @@ public class TaskManager {
     }
 
     private void notifyApplicationStateForeground() {
-        Log.d(TAG, "Application goes foreground.");
         HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
         for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
             onApplicationStateChangedListener.onForeground();
@@ -82,7 +83,6 @@ public class TaskManager {
     }
 
     private void notifyLowMemory() {
-        Log.d(TAG, "System happens to be memory low.");
         HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
         for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
             onApplicationStateChangedListener.onLowMemory();
@@ -90,7 +90,6 @@ public class TaskManager {
     }
 
     void notifyTerminated(int reason, Throwable throwable) {
-        Log.d(TAG, "Application is terminated, reason: " + reason);
         HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
         for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
             onApplicationStateChangedListener.onTerminate(reason, throwable);
@@ -108,7 +107,6 @@ public class TaskManager {
     private HashSet<OnActivityChangedListener> onActivityChangedListeners = new HashSet<>();
 
     private void notifyActivityChanged(Activity previousActivity, Activity currentActivity) {
-        Log.d(TAG, "Activity changed: " + (previousActivity == null ? "null" : previousActivity.getClass().getSimpleName()) + " -> " + (currentActivity == null ? "null" : currentActivity.getClass().getSimpleName()));
         HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
         for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
             onApplicationStateChangedListener.onActivityChanged(previousActivity, currentActivity);
@@ -131,8 +129,10 @@ public class TaskManager {
     private HashMap<Class<? extends Activity> , HashSet<OnActivityStateChangedListener>> onActivityStateChangedListeners = new HashMap<>();
 
     private void notifyActivityStateChanged(Activity activity, ActivityState previousState, ActivityState currentState) {
-        Log.d(TAG, "Activity state changed: " + activity.getClass().getSimpleName() + "@" + previousState.name() + " -> " + currentState.name());
         HashSet<OnActivityStateChangedListener> listeners = this.onActivityStateChangedListeners.get(activity.getClass());
+        if (listeners == null) {
+            listeners = this.onActivityStateChangedListeners.get(Activity.class);
+        }
         if (listeners != null) {
             HashSet<OnActivityStateChangedListener> onActivityStateChangedListeners = (HashSet<OnActivityStateChangedListener>) listeners.clone();
             for (OnActivityStateChangedListener onActivityStateChangedListener : onActivityStateChangedListeners) {
@@ -173,7 +173,6 @@ public class TaskManager {
         application.registerComponentCallbacks(componentCallbacks);
         originalExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler(uncaughtExceptionHandler);
-        Log.d(TAG, "TaskManager.create.");
     }
 
     void onDestroy() {
@@ -181,7 +180,6 @@ public class TaskManager {
         application.unregisterActivityLifecycleCallbacks(lifecycleCallbacks);
         application.unregisterComponentCallbacks(componentCallbacks);
         Thread.setDefaultUncaughtExceptionHandler(originalExceptionHandler);
-        Log.d(TAG, "TaskManager.destroy.");
     }
 
     private ComponentCallbacks componentCallbacks = new ComponentCallbacks() {
@@ -200,48 +198,42 @@ public class TaskManager {
         @Override
         public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
             updateActivityState(activity, ActivityState.CREATED);
-            Log.d(TAG, "onActivityCreated() called with: activity = [" + activity + "], savedInstanceState = [" + savedInstanceState + "]");
         }
 
         @Override
         public void onActivityStarted(Activity activity) {
-            Log.d(TAG, "onActivityStarted() called with: activity = [" + activity + "]");
             updateActivityState(activity, ActivityState.STARTED);
         }
 
         @Override
         public void onActivityResumed(Activity activity) {
-            Log.d(TAG, "onActivityResumed() called with: activity = [" + activity + "]");
             updateActivityState(activity, ActivityState.RESUMED);
         }
 
         @Override
         public void onActivityPaused(Activity activity) {
-            Log.d(TAG, "onActivityPaused() called with: activity = [" + activity + "]");
             updateActivityState(activity, ActivityState.STARTED);
         }
 
         @Override
         public void onActivityStopped(Activity activity) {
-            Log.d(TAG, "onActivityStopped() called with: activity = [" + activity + "]");
             updateActivityState(activity, ActivityState.CREATED);
         }
 
         @Override
         public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
-            Log.d(TAG, "onActivitySaveInstanceState() called with: activity = [" + activity + "], outState = [" + outState + "]");
+
         }
 
         @Override
         public void onActivityDestroyed(Activity activity) {
             updateActivityState(activity, ActivityState.DESTROYED);
-            Log.d(TAG, "onActivityDestroyed() called with: activity = [" + activity + "]");
         }
     };
 
     private Thread.UncaughtExceptionHandler originalExceptionHandler;
 
-    private Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new UncaughtExceptionHandler() {
+    private final Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new UncaughtExceptionHandler() {
         @Override
         public void uncaughtException(Thread thread, Throwable ex) {
             notifyTerminated(OnApplicationStateChangedListener.TERMINATED_BY_CRASH, ex);
@@ -270,7 +262,7 @@ public class TaskManager {
                 if (activityState == ActivityState.DESTROYED) {
                     task.remove(activityInfo);
                     if (task.isEmpty()) {
-                        tasks.remove(task);
+                        tasks.remove(task.getTaskId());
                     }
                 }
                 found = true;
@@ -315,7 +307,6 @@ public class TaskManager {
     }
 
     public static boolean isForeground() {
-        Log.e(TAG, "isForeground: ");
         if (INSTANCE.currentTask.isEmpty()) return false;
         ActivityState activityState = INSTANCE.currentTask.getTaskState();
         return activityState == ActivityState.STARTED || activityState == ActivityState.RESUMED;
@@ -356,11 +347,12 @@ public class TaskManager {
         }
     }
 
-    private void dump() {
-        Log.e(TAG, "Current Task: " + currentTask);
-        for (Entry<Integer, Task> taskEntry : tasks.entrySet()) {
-            Log.e(TAG, taskEntry.getValue().toString());
+    public static List<Task> getAllTasks() {
+        List<Task> snapshot = new ArrayList<>();
+        for (Task task : INSTANCE.tasks.values()) {
+            snapshot.add(task.copy());
         }
+        return snapshot;
     }
 
     public static void setup(Application application) {

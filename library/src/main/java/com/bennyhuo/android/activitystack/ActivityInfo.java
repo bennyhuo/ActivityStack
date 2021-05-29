@@ -10,11 +10,19 @@ public class ActivityInfo {
         RESUMED
     }
 
-    Activity activity;
+    final Activity activity;
     ActivityState activityState = ActivityState.CREATED;
 
     public ActivityInfo(Activity activity) {
         this.activity = activity;
+    }
+
+    public Activity getActivity() {
+        return activity;
+    }
+
+    public ActivityState getActivityState() {
+        return activityState;
     }
 
     @Override
