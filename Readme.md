@@ -1,4 +1,4 @@
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.bennyhuo/activity-stack/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.bennyhuo/activity-stack)
 
 # ActivityStack
 
@@ -13,23 +13,7 @@ Listeners provided for easily observing the changes of the status of the Activit
 I have deployed these modules to maven central, you may add this in your build.gradle:
 
 ```
-implementation("com.bennyhuo:activity-stack:1.0")
-```
-
-### SNAPSHOT
-
-If you want to try the dev version, add this to your build.gradle:
-
-```
-repositories {
-    maven {
-        url "https://oss.sonatype.org/service/local/repositories/snapshots/"
-    }
-}
-
-dependencies {
-    implementation("com.bennyhuo:activity-stack:1.1-SNAPSHOT")
-}
+implementation("com.bennyhuo:activity-stack:1.2")
 ```
 
 ## Usages
@@ -37,7 +21,7 @@ dependencies {
 Setup in Application first:
 
 ```
-TaskManager.setup(this)
+TaskManager.init(this)
 ```
 
 Add listeners:
@@ -47,8 +31,7 @@ TaskManager.addOnActivityChangedListener { previousActivity, currentActivity ->
     Log.d("as", "Activity changed: ${previousActivity?.javaClass?.simpleName} -> ${currentActivity?.javaClass?.simpleName}")
 }
 
-TaskManager.addOnActivityStateChangedListener(MainActivity::class.java) {
-        activity, oldState, newState ->
+TaskManager.addOnActivityStateChangedListener(MainActivity::class.java) { activity, oldState, newState ->
     Log.d("as", "$activity: $oldState -> $newState")
 }
 ```
@@ -58,7 +41,7 @@ If you want to remove those listeners later, you can use the methods like 'remov
 Dump the Activity Task stack:
 
 ```
-TaskManager.getAllTasks().forEach {
+TaskManager.allTasks.forEach {
     Log.i("as", it.toString())
 }
 ```
@@ -66,11 +49,11 @@ TaskManager.getAllTasks().forEach {
 Get current Activity:
 
 ```
-val current = TaskManager.getCurrentActivity() // current resumed activity or null if in the background
+val current = TaskManager.currentActivity // current resumed activity or null if in the background
 ```
 
 Test whether current Application is in the foreground:
 
 ```
-val isForeground = TaskManager.isForeground() // false if running in the background.
+val isForeground = TaskManager.isForeground // false if running in the background.
 ```
