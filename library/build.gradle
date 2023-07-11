@@ -1,15 +1,17 @@
-apply plugin: 'com.android.library'
+plugins {
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
+    id("com.vanniktech.maven.publish")
+}
 
 group = GROUP
 version = VERSION_NAME
 
-apply plugin: "com.vanniktech.maven.publish"
-
 android {
-    compileSdkVersion 29
+    compileSdkVersion 31
 
     defaultConfig {
-        minSdkVersion 14
+        minSdkVersion 21
         targetSdkVersion 29
         versionCode 1
         versionName "1.0"
@@ -20,8 +22,16 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
-
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
 }

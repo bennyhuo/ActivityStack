@@ -1,43 +1,45 @@
-package com.bennyhuo.android.activitystack;
+package com.bennyhuo.android.activitystack
 
-
-import java.util.Stack;
+import android.app.Activity
+import java.util.Stack
 
 /**
  * Created by benny on 11/14/16.
  */
-public class Task extends Stack<ActivityInfo> {
-    public static final String TAG = "Task";
+class Task(val taskId: Int) : Stack<ActivityInfo>() {
 
-    public static final int EMPTY_TASK_ID = -1;
-    public static final Task EMPTY_TASK = new Task(EMPTY_TASK_ID);
-
-    private final int taskId;
-
-    public Task(int taskId) {
-        this.taskId = taskId;
-    }
-
-    public Task copy() {
-        Task task = new Task(taskId);
-        task.addAll(this);
-        return task;
-    }
-
-    public int getTaskId() {
-        return taskId;
-    }
-
-    public ActivityState getTaskState(){
-        int state = ActivityState.CREATED.ordinal();
-        for (ActivityInfo activityInfo : this) {
-            state = Math.max(state, activityInfo.activityState.ordinal());
+    val taskState: ActivityState
+        get() {
+            var state = ActivityState.CREATED.ordinal
+            for (activityInfo in this) {
+                state = Math.max(state, activityInfo.activityState.ordinal)
+            }
+            return ActivityState.values()[state]
         }
-        return ActivityState.values()[state];
+
+    internal fun copy(): Task {
+        val task = Task(taskId)
+        task.addAll(this)
+        return task
     }
 
-    @Override
-    public String toString() {
-        return "{" + taskId + ": " + super.toString() + "}";
+    fun finishActivities(condition: (Activity) -> Boolean): Boolean {
+        var result = false
+        for (activityInfo in this) {
+            if (condition(activityInfo.activity)) {
+                activityInfo.activity.finish()
+                result = true
+            }
+        }
+        return result
+    }
+
+    override fun toString(): String {
+        return "{" + taskId + ": " + super.toString() + "}"
+    }
+
+    companion object {
+        internal const val EMPTY_TASK_ID = -1
+        val EMPTY_TASK = Task(EMPTY_TASK_ID)
     }
 }

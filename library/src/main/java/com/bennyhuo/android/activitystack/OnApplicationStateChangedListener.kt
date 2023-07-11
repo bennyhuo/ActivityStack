@@ -1,18 +1,18 @@
-package com.bennyhuo.android.activitystack;
+package com.bennyhuo.android.activitystack
 
-public interface OnApplicationStateChangedListener {
+interface OnApplicationStateChangedListener {
     /**
      * application goes background with all activities in CREATED state.
      */
-    void onBackground();
+    fun onBackground() {}
 
     /**
      * application goes foreground with one of the activities above CREATED state.
      */
-    void onForeground();
+    fun onForeground() {}
 
     /**
      * called when application exits abnormally.
      */
-    void onTerminate(Throwable throwable);
+    fun onTerminate(throwable: Throwable?) {}
 }

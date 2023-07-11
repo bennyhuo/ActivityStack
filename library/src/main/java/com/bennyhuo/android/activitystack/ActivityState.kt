@@ -1,8 +1,5 @@
-package com.bennyhuo.android.activitystack;
+package com.bennyhuo.android.activitystack
 
-public enum ActivityState {
-    DESTROYED,
-    CREATED,
-    STARTED,
-    RESUMED
+enum class ActivityState {
+    DESTROYED, CREATED, STARTED, RESUMED
 }

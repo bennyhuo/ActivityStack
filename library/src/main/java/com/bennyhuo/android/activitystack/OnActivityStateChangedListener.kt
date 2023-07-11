@@ -1,7 +1,11 @@
-package com.bennyhuo.android.activitystack;
+package com.bennyhuo.android.activitystack
 
-import android.app.Activity;
+import android.app.Activity
 
-public interface OnActivityStateChangedListener {
-    void onActivityStateChanged(Activity activity, ActivityState previousState, ActivityState currentState);
+fun interface OnActivityStateChangedListener {
+    fun onActivityStateChanged(
+        activity: Activity,
+        previousState: ActivityState,
+        currentState: ActivityState
+    )
 }

@@ -22,8 +22,7 @@
 
         <activity android:name=".SecondActivity" />
         <activity
-            android:name=".ThirdActivity"
-            android:taskAffinity="com.bennyhuo.android.activitystack.sample.b" />
+            android:name=".ThirdActivity" />
 
     </application>
 </manifest>

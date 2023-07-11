@@ -14,12 +14,12 @@ class SecondActivity: AppCompatActivity() {
         setContentView(R.layout.activity_second)
 
         getCurrentActivity.setOnClickListener {
-            Log.d("as", "current: ${TaskManager.getCurrentActivity()}")
-            Log.d("as", "foreground: ${TaskManager.isForeground()}")
+            Log.d("as", "current: ${TaskManager.currentActivity}")
+            Log.d("as", "foreground: ${TaskManager.isForeground}")
         }
 
         gotoThird.setOnClickListener {
-            startActivity(Intent(this, ThirdActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            startActivity(Intent(this, ThirdActivity::class.java))
         }
     }
 

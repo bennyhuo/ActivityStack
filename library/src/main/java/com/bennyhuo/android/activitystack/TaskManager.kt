@@ -1,296 +1,296 @@
-package com.bennyhuo.android.activitystack;
+@file:Suppress("UNCHECKED_CAST")
+package com.bennyhuo.android.activitystack
 
-import android.app.Activity;
-import android.app.Application;
-import android.app.Application.ActivityLifecycleCallbacks;
-import android.content.Intent;
-import android.os.Bundle;
+import android.app.Activity
+import android.app.Application
+import android.app.Application.ActivityLifecycleCallbacks
+import android.content.Intent
+import android.os.Bundle
 
-import java.lang.Thread.UncaughtExceptionHandler;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map.Entry;
 
 /**
  * Created by benny on 9/17/16.
  */
-public class TaskManager {
-    public static final String TAG = "TaskManager";
+object TaskManager {
+    private val tasks = HashMap<Int, Task>()
+    private var currentTask = Task.EMPTY_TASK
 
-    final static TaskManager INSTANCE = new TaskManager();
+    val allTasks: List<Task>
+        get() {
+            val snapshot: MutableList<Task> = ArrayList()
+            for (task in tasks.values) {
+                snapshot.add(task.copy())
+            }
+            return snapshot
+        }
 
-    private final HashMap<Integer, Task> tasks = new HashMap<>();
-    private Task currentTask = Task.EMPTY_TASK;
+    private lateinit var application: Application
 
-    private Application application;
+    val isForeground: Boolean
+        get() {
+            if (currentTask.isEmpty()) return false
+            val activityState = currentTask.taskState
+            return activityState === ActivityState.STARTED || activityState === ActivityState.RESUMED
+        }
 
-    private HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = new HashSet<>();
+    val currentActivity: Activity?
+        get() = currentTask.lastOrNull()?.activity
 
-    private void notifyApplicationStateBackground() {
-        HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
-        for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
-            onApplicationStateChangedListener.onBackground();
+    val groundActivity: Activity?
+        get() = currentTask.getOrNull(currentTask.size - 2)?.activity
+
+    private val onApplicationStateChangedListeners = HashSet<OnApplicationStateChangedListener>()
+
+    private fun notifyApplicationStateBackground() {
+        onApplicationStateChangedListeners.toTypedArray().forEach { listener ->
+            listener.onBackground()
         }
     }
 
-    private void notifyApplicationStateForeground() {
-        HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
-        for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
-            onApplicationStateChangedListener.onForeground();
+    private fun notifyApplicationStateForeground() {
+        onApplicationStateChangedListeners.toTypedArray().forEach { listener ->
+            listener.onForeground()
         }
     }
 
-    void notifyTerminated(Throwable throwable) {
-        HashSet<OnApplicationStateChangedListener> onApplicationStateChangedListeners = (HashSet<OnApplicationStateChangedListener>) this.onApplicationStateChangedListeners.clone();
-        for (OnApplicationStateChangedListener onApplicationStateChangedListener : onApplicationStateChangedListeners) {
-            onApplicationStateChangedListener.onTerminate(throwable);
+    fun notifyTerminated(throwable: Throwable?) {
+        onApplicationStateChangedListeners.toTypedArray().forEach { listener ->
+            listener.onTerminate(throwable)
         }
     }
 
-    public static void addOnApplicationStateChangedListener(OnApplicationStateChangedListener onApplicationStateChangedListener) {
-        INSTANCE.onApplicationStateChangedListeners.add(onApplicationStateChangedListener);
-    }
+    private val onActivityChangedListeners = HashSet<OnActivityChangedListener>()
 
-    public static void removeOnApplicationStateChangedListener(OnApplicationStateChangedListener onApplicationStateChangedListener) {
-        INSTANCE.onApplicationStateChangedListeners.remove(onApplicationStateChangedListener);
-    }
-
-    private HashSet<OnActivityChangedListener> onActivityChangedListeners = new HashSet<>();
-
-    private void notifyActivityChanged(Activity previousActivity, Activity currentActivity) {
-        HashSet<OnActivityChangedListener> onActivityChangedListeners = (HashSet<OnActivityChangedListener>) this.onActivityChangedListeners.clone();
-        for (OnActivityChangedListener onActivityChangedListener : onActivityChangedListeners) {
-            onActivityChangedListener.onActivityChanged(previousActivity, currentActivity);
+    private fun notifyActivityChanged(previousActivity: Activity?, currentActivity: Activity?) {
+        onActivityChangedListeners.toTypedArray().forEach { listener ->
+            listener.onActivityChanged(previousActivity, currentActivity)
         }
     }
 
-    public static void addOnActivityChangedListener(OnActivityChangedListener onActivityChangedListener) {
-        INSTANCE.onActivityChangedListeners.add(onActivityChangedListener);
-    }
+    private val onActivityStateChangedListeners =
+        HashMap<Class<out Activity>, HashSet<OnActivityStateChangedListener>>()
 
-    public static void removeOnActivityChangedListener(OnActivityChangedListener onActivityChangedListener) {
-        INSTANCE.onActivityChangedListeners.remove(onActivityChangedListener);
-    }
+    private fun notifyActivityStateChanged(
+        activity: Activity,
+        previousState: ActivityState,
+        currentState: ActivityState
+    ) {
+        var activityClass: Class<*>? = activity.javaClass
+        while (activityClass != null) {
+            val listeners = onActivityStateChangedListeners[activityClass]
+            if (listeners != null) {
+                listeners.toTypedArray().forEach { listener ->
+                    listener.onActivityStateChanged(activity, previousState, currentState)
+                }
+                return
+            }
 
-    private HashMap<Class<? extends Activity> , HashSet<OnActivityStateChangedListener>> onActivityStateChangedListeners = new HashMap<>();
-
-    private void notifyActivityStateChanged(Activity activity, ActivityState previousState, ActivityState currentState) {
-        HashSet<OnActivityStateChangedListener> listeners = this.onActivityStateChangedListeners.get(activity.getClass());
-        if (listeners == null) {
-            listeners = this.onActivityStateChangedListeners.get(Activity.class);
+            if (activityClass == Activity::class.java) {
+                break
+            }
+            activityClass = activityClass.superclass
         }
-        if (listeners != null) {
-            HashSet<OnActivityStateChangedListener> onActivityStateChangedListeners = (HashSet<OnActivityStateChangedListener>) listeners.clone();
-            for (OnActivityStateChangedListener onActivityStateChangedListener : onActivityStateChangedListeners) {
-                onActivityStateChangedListener.onActivityStateChanged(activity, previousState, currentState);
+    }
+
+    fun init(application: Application) {
+        if (this::application.isInitialized) return
+        this.application = application
+        application.registerActivityLifecycleCallbacks(lifecycleCallbacks)
+        originalExceptionHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler(uncaughtExceptionHandler)
+    }
+
+    fun release() {
+        if (!this::application.isInitialized) return
+        application.unregisterActivityLifecycleCallbacks(lifecycleCallbacks)
+        Thread.setDefaultUncaughtExceptionHandler(originalExceptionHandler)
+    }
+
+    private val lifecycleCallbacks = object : ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                updateActivityState(activity, ActivityState.CREATED)
+            }
+
+            override fun onActivityStarted(activity: Activity) {
+                updateActivityState(activity, ActivityState.STARTED)
+            }
+
+            override fun onActivityResumed(activity: Activity) {
+                updateActivityState(activity, ActivityState.RESUMED)
+            }
+
+            override fun onActivityPaused(activity: Activity) {
+                updateActivityState(activity, ActivityState.STARTED)
+            }
+
+            override fun onActivityStopped(activity: Activity) {
+                updateActivityState(activity, ActivityState.CREATED)
+            }
+
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {
+                updateActivityState(activity, ActivityState.DESTROYED)
             }
         }
+    
+    private var originalExceptionHandler: Thread.UncaughtExceptionHandler? = null
+    
+    private val uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, ex ->
+        notifyTerminated(ex)
+        release()
+        originalExceptionHandler?.uncaughtException(thread, ex)
     }
 
-    public static void addOnActivityStateChangedListener(Class<? extends Activity> activityClass, OnActivityStateChangedListener onActivityStateChangedListener) {
-        HashSet<OnActivityStateChangedListener> listeners = INSTANCE.onActivityStateChangedListeners.get(activityClass);
-        if (listeners == null) {
-            listeners = new HashSet<>(1);
-            INSTANCE.onActivityStateChangedListeners.put(activityClass, listeners);
-        }
-        listeners.add(onActivityStateChangedListener);
-    }
-
-    public static void removeAllOnActivityStateChangedListener(Class<? extends Activity> activityClass) {
-        INSTANCE.onActivityStateChangedListeners.remove(activityClass);
-    }
-
-    public static void removeOnActivityStateChangedListener(Class<? extends Activity> activityClass, OnActivityStateChangedListener onActivityStateChangedListener) {
-        HashSet<OnActivityStateChangedListener> listeners = INSTANCE.onActivityStateChangedListeners.get(activityClass);
-        listeners.remove(onActivityStateChangedListener);
-        if(listeners.isEmpty()){
-            INSTANCE.onActivityStateChangedListeners.remove(activityClass);
-        }
-    }
-
-    private TaskManager() {
-
-    }
-
-    void onCreate(Application application) {
-        if (this.application != null && this.application == application) return;
-        this.application = application;
-        application.registerActivityLifecycleCallbacks(lifecycleCallbacks);
-        originalExceptionHandler = Thread.getDefaultUncaughtExceptionHandler();
-        Thread.setDefaultUncaughtExceptionHandler(uncaughtExceptionHandler);
-    }
-
-    void onDestroy() {
-        if (application == null) return;
-        application.unregisterActivityLifecycleCallbacks(lifecycleCallbacks);
-        Thread.setDefaultUncaughtExceptionHandler(originalExceptionHandler);
-    }
-
-    private ActivityLifecycleCallbacks lifecycleCallbacks = new ActivityLifecycleCallbacks() {
-        @Override
-        public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
-            updateActivityState(activity, ActivityState.CREATED);
-        }
-
-        @Override
-        public void onActivityStarted(Activity activity) {
-            updateActivityState(activity, ActivityState.STARTED);
-        }
-
-        @Override
-        public void onActivityResumed(Activity activity) {
-            updateActivityState(activity, ActivityState.RESUMED);
-        }
-
-        @Override
-        public void onActivityPaused(Activity activity) {
-            updateActivityState(activity, ActivityState.STARTED);
-        }
-
-        @Override
-        public void onActivityStopped(Activity activity) {
-            updateActivityState(activity, ActivityState.CREATED);
-        }
-
-        @Override
-        public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
-
-        }
-
-        @Override
-        public void onActivityDestroyed(Activity activity) {
-            updateActivityState(activity, ActivityState.DESTROYED);
-        }
-    };
-
-    private Thread.UncaughtExceptionHandler originalExceptionHandler;
-
-    private final Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new UncaughtExceptionHandler() {
-        @Override
-        public void uncaughtException(Thread thread, Throwable ex) {
-            notifyTerminated(ex);
-            onDestroy();
-            if (originalExceptionHandler != null) {
-                originalExceptionHandler.uncaughtException(thread, ex);
+    private fun updateActivityState(activity: Activity, activityState: ActivityState) {
+        var previousState = ActivityState.DESTROYED
+        val previousActivity = currentActivity
+        val taskId = activity.taskId
+        var task: Task? = null
+        if (taskId == Task.EMPTY_TASK_ID) {
+            if (activityState !== ActivityState.DESTROYED) {
+                // only handle destroy state for activities when task id is -1.  
+                return
             }
-        }
-    };
-
-    private void updateActivityState(Activity activity, ActivityState activityState) {
-        ActivityState previousState = ActivityState.DESTROYED;
-
-        Activity previousActivity = getCurrentActivity();
-
-        Task task = tasks.get(activity.getTaskId());
-        if (task == null) {
-            task = new Task(activity.getTaskId());
-            tasks.put(activity.getTaskId(), task);
-        }
-        boolean found = false;
-        for (ActivityInfo activityInfo : task) {
-            if (activityInfo.activity == activity) {
-                previousState = activityInfo.activityState;
-                activityInfo.activityState = activityState;
-                if (activityState == ActivityState.DESTROYED) {
-                    task.remove(activityInfo);
-                    if (task.isEmpty()) {
-                        tasks.remove(task.getTaskId());
+            LOOP@ for (value in tasks.values) {
+                for (activityInfo in value) {
+                    if (activityInfo.activity === activity) {
+                        task = value
+                        break@LOOP
                     }
                 }
-                found = true;
-                break;
             }
-        }
-        if (activityState == ActivityState.CREATED && !found) {
-            // previousState == DESTROYED
-            task.push(new ActivityInfo(activity));
-        }
-        Task currentTask = Task.EMPTY_TASK;
-        for (Entry<Integer, Task> taskEntry : tasks.entrySet()) {
-            Task entryValue = taskEntry.getValue();
-            if (entryValue.isEmpty()) continue;
-            int stateIndex = entryValue.getTaskState().ordinal();
-            /* >benny: [16-11-14 10:03] task invisible */
-            if (stateIndex < ActivityState.STARTED.ordinal()) continue;
-            if (currentTask == Task.EMPTY_TASK) currentTask = entryValue;
-            /* >benny: [16-11-14 10:04] only one task can be visible, so state cannot be both started or resumed  */
-            if (stateIndex > currentTask.getTaskState().ordinal()) currentTask = entryValue;
-        }
-        setCurrentTask(currentTask);
-
-        Activity currentActivity = getCurrentActivity();
-
-        if(previousActivity != currentActivity) {
-            notifyActivityChanged(previousActivity, currentActivity);
-        }
-
-        notifyActivityStateChanged(activity, previousState, activityState);
-    }
-
-    private void setCurrentTask(Task currentTask) {
-        if (this.currentTask != currentTask) {
-            this.currentTask = currentTask;
-            if (this.currentTask.isEmpty()) {
-                notifyApplicationStateBackground();
-            } else {
-                notifyApplicationStateForeground();
+            if (task == null) {
+                // task not found, this activity is not record in any task, just return.
+                return
             }
-        }
-    }
-
-    public static boolean isForeground() {
-        if (INSTANCE.currentTask.isEmpty()) return false;
-        ActivityState activityState = INSTANCE.currentTask.getTaskState();
-        return activityState == ActivityState.STARTED || activityState == ActivityState.RESUMED;
-    }
-
-    public static Activity getCurrentActivity() {
-        if (INSTANCE.currentTask.isEmpty()) return null;
-        return INSTANCE.currentTask.peek().activity;
-    }
-
-    public static Activity getGroundActivity() {
-        if (INSTANCE.currentTask.size() > 1) {
-            return INSTANCE.currentTask.get(INSTANCE.currentTask.size() - 2).activity;
-        } else if (INSTANCE.currentTask.size() == 1) {
-            return INSTANCE.currentTask.peek().activity;
         } else {
-            return null;
+            task = tasks[taskId]
+        }
+        if (task == null) {
+            task = Task(taskId)
+            tasks[taskId] = task
+        }
+        var found = false
+        for (activityInfo in task) {
+            if (activityInfo.activity === activity) {
+                previousState = activityInfo.activityState
+                activityInfo.activityState = activityState
+                if (activityState === ActivityState.DESTROYED) {
+                    task.remove(activityInfo)
+                    if (task.isEmpty()) {
+                        tasks.remove(task.taskId)
+                    }
+                }
+                found = true
+                break
+            }
+        }
+        if (activityState === ActivityState.CREATED && !found) {
+            // previousState == DESTROYED
+            task.push(ActivityInfo(activity))
+        }
+        var currentTask = Task.EMPTY_TASK
+        for (entryValue in tasks.values) {
+            if (entryValue.isEmpty()) continue
+            val stateIndex = entryValue.taskState.ordinal
+            /* task invisible */
+            if (stateIndex < ActivityState.STARTED.ordinal) continue
+            if (currentTask === Task.EMPTY_TASK) currentTask = entryValue
+            /* only one task can be visible, so state cannot be both started or resumed */
+            if (stateIndex > currentTask.taskState.ordinal) currentTask = entryValue
+        }
+        
+        setCurrentTask(currentTask)
+        val currentActivity = this.currentActivity
+        if (previousActivity !== currentActivity) {
+            notifyActivityChanged(previousActivity, currentActivity)
+        }
+        notifyActivityStateChanged(activity, previousState, activityState)
+    }
+
+    private fun setCurrentTask(currentTask: Task) {
+        if (this.currentTask !== currentTask) {
+            this.currentTask = currentTask
+            if (this.currentTask.isEmpty()) {
+                notifyApplicationStateBackground()
+            } else {
+                notifyApplicationStateForeground()
+            }
         }
     }
 
-    public static void recreateActivities() {
-        Activity currentActivity = getCurrentActivity();
-        for (Entry<Integer, Task> entry : INSTANCE.tasks.entrySet()) {
-            for (ActivityInfo activityInfo : entry.getValue()) {
-                if (activityInfo.activity != currentActivity)
-                    activityInfo.activity.recreate();
+    fun addOnApplicationStateChangedListener(listener: OnApplicationStateChangedListener) {
+        onApplicationStateChangedListeners.add(listener)
+    }
+
+    fun removeOnApplicationStateChangedListener(listener: OnApplicationStateChangedListener) {
+        onApplicationStateChangedListeners.remove(listener)
+    }
+
+    fun addOnActivityChangedListener(listener: OnActivityChangedListener) {
+        onActivityChangedListeners.add(listener)
+    }
+
+    fun removeOnActivityChangedListener(listener: OnActivityChangedListener) {
+        onActivityChangedListeners.remove(listener)
+    }
+
+    fun addOnActivityStateChangedListener(
+        activityClass: Class<out Activity>,
+        listener: OnActivityStateChangedListener
+    ) {
+        var listeners = onActivityStateChangedListeners[activityClass]
+        if (listeners == null) {
+            listeners = HashSet(1)
+            onActivityStateChangedListeners[activityClass] = listeners
+        }
+        listeners.add(listener)
+    }
+
+    fun removeAllOnActivityStateChangedListener(activityClass: Class<out Activity>) {
+        onActivityStateChangedListeners.remove(activityClass)
+    }
+
+    fun removeOnActivityStateChangedListener(
+        activityClass: Class<out Activity>,
+        listener: OnActivityStateChangedListener
+    ) {
+        val listeners = onActivityStateChangedListeners[activityClass]!!
+        listeners.remove(listener)
+        if (listeners.isEmpty()) {
+            onActivityStateChangedListeners.remove(activityClass)
+        }
+    }
+
+    fun finishActivities(condition: (Activity) -> Boolean): Boolean {
+        var result = false
+        for (value in tasks.values) {
+            result = result or value.finishActivities(condition)
+        }
+        return result
+    }
+
+    fun finishActivities(activityClass: Class<out Activity?>): Boolean {
+        return finishActivities { activity: Activity -> activity.javaClass == activityClass }
+    }
+
+    inline fun <reified T : Activity> finishActivities() {
+        finishActivities(T::class.java)
+    }
+
+    fun recreateActivities() {
+        val currentActivity = this.currentActivity
+        tasks.values.forEach {task -> 
+            task.forEach { activityInfo ->
+                if (activityInfo.activity !== currentActivity) activityInfo.activity.recreate()
             }
         }
 
         if (currentActivity != null) {
-            Intent intent = currentActivity.getIntent();
-            if (intent == null) {
-                intent = new Intent(currentActivity, currentActivity.getClass());
-            }
-            currentActivity.finish();
-            currentActivity.startActivity(intent);
-            currentActivity.overridePendingTransition(0, 0);
+            val intent = currentActivity.intent ?: Intent(currentActivity, currentActivity.javaClass)
+            currentActivity.finish()
+            currentActivity.startActivity(intent)
+            currentActivity.overridePendingTransition(0, 0)
         }
     }
-
-    public static List<Task> getAllTasks() {
-        List<Task> snapshot = new ArrayList<>();
-        for (Task task : INSTANCE.tasks.values()) {
-            snapshot.add(task.copy());
-        }
-        return snapshot;
-    }
-
-    public static void setup(Application application) {
-        TaskManager.INSTANCE.onCreate(application);
-    }
-
 }

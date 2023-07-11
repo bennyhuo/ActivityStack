@@ -14,8 +14,8 @@ class MainActivity: AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         getCurrentActivity.setOnClickListener {
-            Log.d("as", "current: ${TaskManager.getCurrentActivity()}")
-            Log.d("as", "foreground: ${TaskManager.isForeground()}")
+            Log.d("as", "current: ${TaskManager.currentActivity}")
+            Log.d("as", "foreground: ${TaskManager.isForeground}")
         }
 
         gotoSecond.setOnClickListener {
