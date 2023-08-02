@@ -265,7 +265,8 @@ object TaskManager {
     fun finishActivities(condition: (Activity) -> Boolean): Boolean {
         var result = false
         for (value in tasks.values) {
-            result = result or value.finishActivities(condition)
+            // avoid short circuit
+            result = value.finishActivities(condition) or result
         }
         return result
     }
