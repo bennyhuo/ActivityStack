@@ -53,9 +53,9 @@ object TaskManager {
         }
     }
 
-    fun notifyTerminated(throwable: Throwable?) {
+    private fun notifyUncaughtException(throwable: Throwable?) {
         onApplicationStateChangedListeners.toTypedArray().forEach { listener ->
-            listener.onTerminate(throwable)
+            listener.onUncaughtException(throwable)
         }
     }
 
@@ -136,8 +136,7 @@ object TaskManager {
     private var originalExceptionHandler: Thread.UncaughtExceptionHandler? = null
     
     private val uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { thread, ex ->
-        notifyTerminated(ex)
-        release()
+        notifyUncaughtException(ex)
         originalExceptionHandler?.uncaughtException(thread, ex)
     }
 

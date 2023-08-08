@@ -13,7 +13,7 @@ Listeners provided for easily observing the changes of the status of the Activit
 I have deployed these modules to maven central, you may add this in your build.gradle:
 
 ```
-implementation("com.bennyhuo:activity-stack:1.2.0")
+implementation("com.bennyhuo:activity-stack:1.3.0")
 ```
 
 ## Usages

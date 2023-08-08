@@ -14,5 +14,5 @@ interface OnApplicationStateChangedListener {
     /**
      * called when application exits abnormally.
      */
-    fun onTerminate(throwable: Throwable?) {}
+    fun onUncaughtException(throwable: Throwable?) {}
 }
