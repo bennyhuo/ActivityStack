@@ -26,12 +26,8 @@ object TaskManager {
 
     private lateinit var application: Application
 
-    val isForeground: Boolean
-        get() {
-            if (currentTask.isEmpty()) return false
-            val activityState = currentTask.taskState
-            return activityState === ActivityState.STARTED || activityState === ActivityState.RESUMED
-        }
+    var isForeground: Boolean = false
+        private set
 
     val currentActivity: Activity?
         get() = currentTask.lastOrNull()?.activity
@@ -204,7 +200,18 @@ object TaskManager {
         if (previousActivity !== currentActivity) {
             notifyActivityChanged(previousActivity, currentActivity)
         }
+        computeForeground()
+
         notifyActivityStateChanged(activity, previousState, activityState)
+    }
+
+    private fun computeForeground() {
+        isForeground = if (currentTask.isEmpty()) {
+            false
+        } else {
+            val activityState = currentTask.taskState
+            activityState >= ActivityState.STARTED
+        }
     }
 
     private fun setCurrentTask(currentTask: Task) {
